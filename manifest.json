@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Google QR 自动降级短信助手",
+  "name": "Trợ lý Chuyển mã QR Google sang SMS",
   "version": "1.1.0",
-  "description": "自动识别 Google 验证二维码、注入 [3,null,4] 降级状态，并在全链路 (含 batchexecute 提交验证码接口) 保持 iPad Mini 环境",
+  "description": "Tự động nhận diện mã QR xác minh Google, kích hoạt trạng thái [3,null,4] và giả lập iPad Mini để chuyển về nhận OTP SMS 6 số",
+  "icons": {
+    "16": "assets/icon-16.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
   "permissions": [
     "declarativeNetRequest",
     "declarativeNetRequestWithHostAccess",

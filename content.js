@@ -11,7 +11,7 @@
   
   const title = document.createElement("div");
   title.style.cssText = "font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center;";
-  title.textContent = "⚡ Google 验证降级助手 v1.1";
+  title.textContent = "⚡ Trợ lý Chuyển QR Google sang SMS v1.1";
   panel.appendChild(title);
 
   const statusEl = document.createElement("div");
@@ -25,28 +25,88 @@
   document.body.appendChild(panel);
 
   if (isCloudConsole) {
-    statusEl.textContent = "第一步：点击右上角终端图标 [>_] 唤出 Verify 弹窗，或点下方按钮自动唤起";
-    btn.textContent = "1. 自动点击 Cloud Shell 终端图标";
+    statusEl.textContent = "Bước 1: Click biểu tượng terminal [>_] góc trên phải để mở Verify, hoặc bấm nút dưới để tự động mở";
+    btn.textContent = "1. Tự động click Cloud Shell";
     btn.onclick = () => {
-      const shellBtn = document.querySelector('button[aria-label*="Cloud Shell"], button[mattooltip*="Cloud Shell"], [id*="cloudshell"]');
-      if (shellBtn) {
-        shellBtn.click();
-        statusEl.textContent = "✅ 已点击终端图标，等待底部弹出 Verify 按钮...";
-        setTimeout(() => {
-          const allBtns = Array.from(document.querySelectorAll("button, a"));
-          const verifyBtn = allBtns.find(b => b.textContent.trim() === "Verify");
-          if (verifyBtn) {
-            verifyBtn.click();
-            statusEl.textContent = "✅ 已自动点击 Verify 按钮！";
+      // Tìm chính xác theo data-icon-name="devshellIcon"
+      function getDevShellTarget() {
+        // 1. Quét thông thường
+        const directSvg = document.querySelector('[data-icon-name="devshellIcon"]');
+        if (directSvg) {
+          return directSvg.closest('button, [role="button"], a, cfc-icon-button') || directSvg.parentElement || directSvg;
+        }
+
+        // 2. Quét xuyên Shadow DOM
+        const stack = [document.body];
+        while (stack.length > 0) {
+          const node = stack.pop();
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.getAttribute && node.getAttribute('data-icon-name') === 'devshellIcon') {
+              return node.closest('button, [role="button"], a, cfc-icon-button') || node.parentElement || node;
+            }
+            if (node.querySelector) {
+              const inside = node.querySelector('[data-icon-name="devshellIcon"]');
+              if (inside) {
+                return inside.closest('button, [role="button"], a, cfc-icon-button') || inside.parentElement || inside;
+              }
+            }
+            if (node.shadowRoot) stack.push(node.shadowRoot);
           }
-        }, 2500);
+          const children = node.children || node.childNodes;
+          if (children) {
+            for (let i = children.length - 1; i >= 0; i--) {
+              const c = children[i];
+              if (c.nodeType === Node.ELEMENT_NODE) stack.push(c);
+            }
+          }
+        }
+
+        // 3. Dự phòng theo nhãn
+        const allClickable = Array.from(document.querySelectorAll('button, [role="button"], a, cfc-icon-button, [tabindex="0"]'));
+        for (const el of allClickable) {
+          const label = ((el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('title') || '') + ' ' + (el.getAttribute('mattooltip') || '')).toLowerCase();
+          if (label.includes('cloud shell') || label.includes('terminal') || label.includes('devshell')) {
+            return el;
+          }
+        }
+        return null;
+      }
+
+      const shellBtn = getDevShellTarget();
+      if (shellBtn) {
+        const events = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
+        for (const evt of events) {
+          shellBtn.dispatchEvent(new MouseEvent(evt, { bubbles: true, cancelable: true, view: window, composed: true }));
+        }
+        if (typeof shellBtn.click === 'function') shellBtn.click();
+
+        statusEl.textContent = "✅ Đã click biểu tượng terminal (devshellIcon), đang đợi nút Verify xuất hiện...";
+        
+        let checkCount = 0;
+        const interval = setInterval(() => {
+          checkCount++;
+          const allBtns = Array.from(document.querySelectorAll("button, a, [role='button']"));
+          const verifyBtn = allBtns.find(b => {
+            const t = (b.textContent || '').trim().toLowerCase();
+            const aria = (b.getAttribute('aria-label') || '').toLowerCase();
+            return (t === 'verify' || t.includes('vérif') || t.includes('xác minh') || aria.includes('verify') || aria.includes('vérif'));
+          });
+          if (verifyBtn) {
+            clearInterval(interval);
+            verifyBtn.click();
+            statusEl.textContent = "✅ Đã tự động click nút Verify!";
+          } else if (checkCount >= 10) {
+            clearInterval(interval);
+            statusEl.textContent = "ℹ️ Đã mở terminal, nếu có nút Verify/Vérifier hãy click vào đó.";
+          }
+        }, 500);
       } else {
-        statusEl.textContent = "⚠️ 未找到终端按钮，请手动点击右上角 [>_] 图标";
+        statusEl.textContent = "⚠️ Không tìm thấy nút terminal, vui lòng tự click biểu tượng [>_] ở thanh trên";
       }
     };
   } else if (isQrPage) {
-    statusEl.textContent = "已检测到二维码验证页，点击下方按钮一键注入 [3,null,4] 并跳入选择页";
-    btn.textContent = "⚡ 一键降级到短信选择框";
+    statusEl.textContent = "Đã phát hiện trang mã QR, click nút bên dưới để hạ cấp về nhận OTP SMS";
+    btn.textContent = "⚡ Hạ cấp sang nhận SMS";
     btn.onclick = runDowngrade;
   }
 
@@ -80,28 +140,28 @@
     const html = document.documentElement.innerHTML;
     const m = html.match(/https:\/\/accounts\.google\.com\/devicephoneverification\/begin\?[^"'\s<>]+/);
     if (m) return m[0].replace(/\\u003d/g, "=").replace(/\\u0026/g, "&");
-    throw new Error("未能在当前页面识别到二维码，请确认二维码图片已加载");
+    throw new Error("Không thể nhận diện mã QR trên trang, vui lòng đảm bảo ảnh QR đã tải xong");
   }
 
   async function runDowngrade() {
     try {
       btn.disabled = true;
-      btn.textContent = "正在识别二维码...";
+      btn.textContent = "Đang nhận diện mã QR...";
       const qrUrl = await extractQrUrlFromPage();
-      statusEl.textContent = "已提取二维码，正在后台注入 [3,null,4]...";
+      statusEl.textContent = "Đã lấy mã QR, đang gửi payload [3,null,4]...";
 
       const res = await chrome.runtime.sendMessage({ action: "downgradeQr", qrUrl });
       if (!res || !res.ok) {
-        throw new Error(res ? res.error : "后台请求失败");
+        throw new Error(res ? res.error : "Gửi yêu cầu nền thất bại");
       }
       if (!res.ydResp.includes("[3,null,4]")) {
-        statusEl.textContent = "⚠️ 服务端返回: " + res.ydResp.slice(0, 80);
+        statusEl.textContent = "⚠️ Máy chủ Google phản hồi: " + res.ydResp.slice(0, 80);
         btn.disabled = false;
-        btn.textContent = "重试一键降级";
+        btn.textContent = "Thử lại hạ cấp";
         return;
       }
 
-      statusEl.textContent = "✅ [3,null,4] 注入成功！正在跳转短信验证页...";
+      statusEl.textContent = "✅ Kích hoạt [3,null,4] thành công! Đang chuyển hướng sang trang SMS...";
       const params = new URLSearchParams(location.search);
       let cont = params.get("continue") || "";
       let targetUrl = "";
@@ -119,7 +179,7 @@
     } catch (e) {
       statusEl.textContent = "❌ " + e.message;
       btn.disabled = false;
-      btn.textContent = "重试一键降级";
+      btn.textContent = "Thử lại hạ cấp";
     }
   }
 })();

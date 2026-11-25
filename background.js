@@ -3,16 +3,17 @@ const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleW
 
 function setupRules() {
   chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [1, 2],
+    removeRuleIds: [1, 2, 3],
     addRules: [
       {
-        // 规则 1：覆盖 accounts.google.com 全路径（包括 /uplevelingstep/*、/v3/signin/* 以及提交 6 位验证码的 /_/IdvUplevelingUi/data/batchexecute 接口）
+        // Quy tắc 1: accounts.google.com - giả lập iPad Mini và ép ngôn ngữ tiếng Anh
         id: 1,
         priority: 1,
         action: {
           type: "modifyHeaders",
           requestHeaders: [
             { header: "User-Agent", operation: "set", value: IPAD_MINI_UA },
+            { header: "Accept-Language", operation: "set", value: "en-US,en;q=0.9" },
             { header: "Sec-CH-UA", operation: "remove" },
             { header: "Sec-CH-UA-Mobile", operation: "remove" },
             { header: "Sec-CH-UA-Platform", operation: "remove" },
@@ -30,13 +31,14 @@ function setupRules() {
         }
       },
       {
-        // 规则 2：更高优先级，仅对后台模拟手机扫二维码的 /devicephoneverification/* 使用 iPhone UA
+        // Quy tắc 2: devicephoneverification - iPhone UA
         id: 2,
         priority: 10,
         action: {
           type: "modifyHeaders",
           requestHeaders: [
             { header: "User-Agent", operation: "set", value: IPHONE_UA },
+            { header: "Accept-Language", operation: "set", value: "en-US,en;q=0.9" },
             { header: "Sec-CH-UA", operation: "remove" },
             { header: "Sec-CH-UA-Mobile", operation: "remove" },
             { header: "Sec-CH-UA-Platform", operation: "remove" },
@@ -47,6 +49,21 @@ function setupRules() {
         },
         condition: {
           urlFilter: "||accounts.google.com/devicephoneverification/*",
+          resourceTypes: ["main_frame", "sub_frame", "xmlhttprequest", "other"]
+        }
+      },
+      {
+        // Quy tắc 3: console.cloud.google.com - ép toàn bộ giao diện và header về tiếng Anh
+        id: 3,
+        priority: 1,
+        action: {
+          type: "modifyHeaders",
+          requestHeaders: [
+            { header: "Accept-Language", operation: "set", value: "en-US,en;q=0.9" }
+          ]
+        },
+        condition: {
+          urlFilter: "||console.cloud.google.com/*",
           resourceTypes: ["main_frame", "sub_frame", "xmlhttprequest", "other"]
         }
       }
@@ -95,7 +112,7 @@ async function handleDowngrade(qrUrl) {
     if (tlMatch) tl = tlMatch[0];
   }
   if (!atMatch || !dshMatch || !tl) {
-    throw new Error("未能从二维码页面提取出 SNlM0e / Qzxixc / TL 参数");
+    throw new Error("Không thể trích xuất tham số SNlM0e / Qzxixc / TL từ trang mã QR");
   }
   const at = atMatch[1];
   const dsh = dshMatch[1];
@@ -122,7 +139,7 @@ async function handleDowngrade(qrUrl) {
   const consentHtml = await consentResp.text();
   const uuidMatch = consentHtml.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/);
   if (!uuidMatch) {
-    throw new Error("未能从 consent 页面提取到 UUID");
+    throw new Error("Không thể trích xuất UUID từ trang consent");
   }
   const rid = uuidMatch[0];
 
